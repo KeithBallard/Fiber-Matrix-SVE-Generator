@@ -60,63 +60,37 @@ class GmshMesher:
             fiber_disks.append(add_fiber_disk(f))
             for g in f.ghost_fibers:
                 fiber_disks.append(add_fiber_disk(g))
+                print(g.center)
         
         gmsh.model.occ.synchronize()
 
+        if visualize_gui:
+            gmsh.fltk.run()
+
+        # 3. Clip fibers to RVE using Intersect
+        # We want the part of fibers INSIDE the RVE.
+        # Object=Fibers, Tool=RVE
         
-        gmsh.model.occ.synchronize()
-        
-        # 3. Create Inverse RVE Tool to clip fibers
-        # Calculate bounding box of all fibers to ensure we cover them
-        if not fibers:
-            return
-            
-        min_x = min(f.center[0] - f.radius for f in fibers)
-        max_x = max(f.center[0] + f.radius for f in fibers)
-        min_y = min(f.center[1] - f.radius for f in fibers)
-        max_y = max(f.center[1] + f.radius for f in fibers)
-        
-        # Add some margin
-        margin = max(f.radius for f in fibers) * 2.0
-        min_x -= margin
-        max_x += margin
-        min_y -= margin
-        max_y += margin
-        
-        # Create the Box
-        tool_box_tag = gmsh.model.occ.addRectangle(min_x, min_y, 0, max_x - min_x, max_y - min_y)
-        
-        # Cut RVE from Box to get "Inverse RVE"
-        # We start with the box and subtract the RVE face.
-        # We MUST keep the RVE face for the final mesh.
-        # removeTool=False (keep RVE face), removeObject=True (consume box)
-        inverse_rve_dimtags, _ = gmsh.model.occ.cut([(2, tool_box_tag)], [(2, rve_face)], removeObject=True, removeTool=False)
-        
-        # 4. Clip Fibers
-        # Cut Inverse RVE from Fibers
-        # original fibers are 'fiber_disks'
+        rve_dimtag = (2, rve_face)
         fiber_dimtags = [(2, t) for t in fiber_disks]
         
-        # removeObject=True (consume original fibers), removeTool=False (keep inverse tool? actually we can delete it now)
-        # But wait, cut() behaves pairwise or all-against-all?
-        # "Boolean difference of objectDimTags and toolDimTags".
-        clipped_fibers_dimtags, _ = gmsh.model.occ.cut(fiber_dimtags, inverse_rve_dimtags, removeObject=True, removeTool=True)
+        # Intersect(Fibers, RVE). removeObject=True (consume fibers), removeTool=False (keep RVE).
+        clipped_fibers_dimtags, _ = gmsh.model.occ.intersect(fiber_dimtags, [rve_dimtag], removeObject=True, removeTool=False)
         
-        # 5. Fragment
-        # Now fragment the RVE face with the clipped fibers.
-        # This will embed the fiber boundaries into the RVE face.
-        rve_dimtag = (2, rve_face)
-        # Note: clipped_fibers_dimtags contains the fibers restricted to inside RVE.
+        gmsh.model.occ.synchronize()
+
+        if visualize_gui:
+             gmsh.fltk.run()
         
-        # We fragment RVE with Clipped Fibers.
-        # This partitions the RVE face.
+        # 4. Fragment
+        # Embed the clipped fibers into the RVE face.
         out_dimtags, out_dimtags_map = gmsh.model.occ.fragment([rve_dimtag], clipped_fibers_dimtags)
         
         gmsh.model.occ.synchronize()
-
-        gmsh.fltk.run()
+        if visualize_gui:
+             gmsh.fltk.run()
         
-        # 4. Identity Matrix vs Fibers
+        # 5. Identity Matrix vs Fibers
         final_fiber_tags = []
         final_matrix_tags = []
         
@@ -153,7 +127,7 @@ class GmshMesher:
                 
         gmsh.model.occ.synchronize()
         
-        # 5. Apply Periodic Conditions
+        # 6. Apply Periodic Conditions
         # Re-fetch lines as they might have been split
         lines = gmsh.model.getEntities(1)
         boundary_line_map = {b: [] for b in boundaries}
@@ -166,7 +140,6 @@ class GmshMesher:
                 dist = b.get_distance_to_fiber(np.array(com[:2])) 
                 if dist < 1e-5:
                      boundary_line_map[b].append(tag)
-                     # break # A line could theoretically be on multiple boundaries if they overlap? No.
         
         for b in boundaries:
             if b.type == BoundaryType.PERIODIC and b.pair is not None:
@@ -189,7 +162,7 @@ class GmshMesher:
                          else:
                             print(f"Warning: Mismatch in periodic boundary segments for boundary {b.index} vs {b.pair.index} ({len(slave_tags)} vs {len(master_tags)}). Skipping periodic constraint.")
 
-        # 6. Physical Groups and Generation
+        # 7. Physical Groups and Generation
         p_matrix = gmsh.model.addPhysicalGroup(2, final_matrix_tags)
         gmsh.model.setPhysicalName(2, p_matrix, "Matrix")
         
