@@ -51,6 +51,7 @@ Check out the [API Reference](api/rve.md) to see how to use the `FiberRVE` class
     mkdocs_yaml = """site_name: Fiber Matrix SVE
 theme:
   name: material
+  logo: assets/logo.png
   features:
     - navigation.sections
     - navigation.indexes
@@ -81,9 +82,7 @@ nav:
 
     print("Configuration and content generated.")
 
-    # 6. Run MkDocs Build
-    print("Building documentation site...")
-
+    # 6. Run MkDocs
     # Ensure current directory is in PYTHONPATH so mkdocstrings can find the package
     env = os.environ.copy()
     env["PYTHONPATH"] = (
@@ -92,21 +91,27 @@ nav:
         + env.get("PYTHONPATH", "")
     )
 
-    mkdocs_exe = os.path.join(os.path.dirname(sys.executable), "mkdocs")
+    # Check for --serve argument
+    if "--serve" in sys.argv:
+        print("Starting MkDocs Live Preview...")
+        try:
+            # interactive process, let it take over stdout/stderr
+            subprocess.call([sys.executable, "-m", "mkdocs", "serve"], env=env)
+        except KeyboardInterrupt:
+            print("\nStopped.")
+        return
+
+    print("Building documentation site...")
 
     try:
-        subprocess.check_call([mkdocs_exe, "build"], env=env)
+        # Use python -m mkdocs to ensure we use the module in the current venv
+        subprocess.check_call([sys.executable, "-m", "mkdocs", "build"], env=env)
         print("\\nDocumentation build successful!")
         print("Static site generated in 'site/' directory.")
-        print("To preview, run: python -m mkdocs serve")
-    except Exception as e:
+        print("To preview, run: python build_docs.py --serve")
+    except subprocess.CalledProcessError as e:
         print(f"Error building documentation: {e}")
-        # Try shell fallback with modified env
-        try:
-            subprocess.check_call("mkdocs build", shell=True, env=env)
-        except subprocess.CalledProcessError as e2:
-            print(f"Error building documentation (fallback): {e2}")
-            sys.exit(1)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

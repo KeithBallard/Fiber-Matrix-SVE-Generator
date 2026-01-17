@@ -68,8 +68,6 @@ class GmshMesher:
         gmsh.initialize()
         gmsh.model.add(self.mesh_name)
 
-        visualize_gui = True
-
         # Use OpenCASCADE kernel for robust boolean operations
 
         # 1. Create RVE Polygon
