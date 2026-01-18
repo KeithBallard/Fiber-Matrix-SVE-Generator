@@ -298,52 +298,13 @@ class GmshMesher:
                     ]
 
                     if slave_tags and master_tags:
-                        # Robustly match segments based on geometry
-                        matched_slave = []
-                        matched_master = []
+                        matched_slave, matched_master = (
+                            self._get_periodic_boundary_mapping(
+                                slave_tags, master_tags, translation
+                            )
+                        )
 
-                        # Copy lists to avoid modifying originals during iteration if needed
-                        remaining_masters = list(master_tags)
-
-                        for s_tag in slave_tags:
-                            s_com = np.array(gmsh.model.occ.getCenterOfMass(1, s_tag))
-                            # Expected master position = Slave - Translation (since T = S - M)
-                            expected_m_com = s_com - np.array(translation[:3])
-
-                            best_idx = -1
-                            # Debug: print info
-                            print(f"  Slave Tags: {slave_tags}")
-                            for t in slave_tags:
-                                com = gmsh.model.occ.getCenterOfMass(1, t)
-                                mass = gmsh.model.occ.getMass(1, t)
-                                print(
-                                    f"    S-Tag {t}: CoM {np.round(com, 5)}, L={mass}"
-                                )
-                            print(f"  Master Tags: {master_tags}")
-                            for t in master_tags:
-                                com = gmsh.model.occ.getCenterOfMass(1, t)
-                                mass = gmsh.model.occ.getMass(1, t)
-                                print(
-                                    f"    M-Tag {t}: CoM {np.round(com, 5)}, L={mass}"
-                                )
-                            min_dist = 1e-6  # Tolerance
-
-                            for i, m_tag in enumerate(remaining_masters):
-                                m_com = np.array(
-                                    gmsh.model.occ.getCenterOfMass(1, m_tag)
-                                )
-                                dist = np.linalg.norm(m_com - expected_m_com)
-                                if dist < min_dist:
-                                    min_dist = dist
-                                    best_idx = i
-
-                            if best_idx != -1:
-                                matched_slave.append(s_tag)
-                                matched_master.append(remaining_masters[best_idx])
-                                # Remove matched master to handle 1-to-1 assumption
-                                remaining_masters.pop(best_idx)
-
-                        if len(matched_slave) > 0:
+                        if matched_slave:
                             if len(matched_slave) != len(slave_tags) or len(
                                 matched_master
                             ) != len(master_tags):
@@ -455,3 +416,49 @@ class GmshMesher:
                         print(
                             f"Periodic check passed for boundary {b.index} <-> {b.pair.index}"
                         )
+
+    def _get_periodic_boundary_mapping(
+        self, slave_tags: List[int], master_tags: List[int], translation: List[float]
+    ) -> Tuple[List[int], List[int]]:
+        """Finds a 1-to-1 mapping between slave and master curve segments based on CoM.
+
+        Parameters
+        ----------
+        slave_tags : List[int]
+            List of curve tags on the slave boundary.
+        master_tags : List[int]
+            List of curve tags on the master boundary.
+        translation : List[float]
+            The 16-element transformation matrix (GMSH format).
+
+        Returns
+        -------
+        Tuple[List[int], List[int]]
+            A tuple of (matched_slave_tags, matched_master_tags).
+        """
+        matched_slave = []
+        matched_master = []
+        remaining_masters = list(master_tags)
+        trans_vec = np.array(translation[3:12:4])  # Extract [tx, ty, tz]
+
+        # In GMSH: Slave = Master + Translation, so Master = Slave - Translation
+        for s_tag in slave_tags:
+            s_com = np.array(gmsh.model.occ.getCenterOfMass(1, s_tag))
+            expected_m_com = s_com - trans_vec
+
+            best_idx = -1
+            min_dist = 1e-6  # Tolerance
+
+            for i, m_tag in enumerate(remaining_masters):
+                m_com = np.array(gmsh.model.occ.getCenterOfMass(1, m_tag))
+                dist = np.linalg.norm(m_com - expected_m_com)
+                if dist < min_dist:
+                    min_dist = dist
+                    best_idx = i
+
+            if best_idx != -1:
+                matched_slave.append(s_tag)
+                matched_master.append(remaining_masters[best_idx])
+                remaining_masters.pop(best_idx)
+
+        return matched_slave, matched_master
