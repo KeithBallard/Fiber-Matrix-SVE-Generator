@@ -1,6 +1,7 @@
 import sys
 from typing import List, Optional, Tuple
 import numpy as np
+from scipy.spatial import KDTree
 
 try:
     import gmsh
@@ -8,7 +9,7 @@ except ImportError:
     gmsh = None
 
 from fiber_matrix.models.boundary import LinearBoundary, BoundaryType
-from fiber_matrix.models.fiber import Fiber, PeriodicMasterFiber
+from fiber_matrix.models.fiber import Fiber, PeriodicPrimaryFiber
 
 
 class GmshMesher:
@@ -39,7 +40,7 @@ class GmshMesher:
 
     def create_mesh(
         self,
-        fibers: List[PeriodicMasterFiber],
+        fibers: List[PeriodicPrimaryFiber],
         boundaries: List[LinearBoundary],
         mesh_size_factor: float = 1.0,
         visualize_gui: bool = False,
@@ -49,7 +50,7 @@ class GmshMesher:
 
         Parameters
         ----------
-        fibers : List[PeriodicMasterFiber]
+        fibers : List[PeriodicPrimaryFiber]
             List of fibers to include in the mesh.
         boundaries : List[LinearBoundary]
             List of boundaries defining the RVE.
@@ -253,30 +254,30 @@ class GmshMesher:
         lines = gmsh.model.getEntities(1)
         boundary_line_map = {b: [] for b in boundaries}
 
+        # Calculate a relative tolerance for boundary matching based on RVE extent
+        boundary_dist_tolerance = rve_extent * 1e-8
+
         for l in lines:
             tag = l[1]
             com = gmsh.model.occ.getCenterOfMass(1, tag)
             for b_idx, b in enumerate(boundaries):
                 # Distance to segment
                 dist = b.get_distance_to_fiber(np.array(com[:2]))
-                if dist < 1e-5:
-                    # Check length to filter out numerical artifacts
-                    length = gmsh.model.occ.getMass(1, tag)
-                    if length > 1e-8:
-                        boundary_line_map[b].append(tag)
+                if dist < boundary_dist_tolerance:
+                    boundary_line_map[b].append(tag)
 
         for b in boundaries:
             if b.type == BoundaryType.PERIODIC and b.pair is not None:
                 if hasattr(b, "index") and b.index < b.pair.index:
-                    slave_tags = boundary_line_map[b]
-                    master_tags = boundary_line_map[b.pair]
+                    secondary_tags = boundary_line_map[b]
+                    primary_tags = boundary_line_map[b.pair]
 
-                    # Simple translation vector from Master to Slave
-                    # M + T = S  => T = S - M
+                    # Simple translation vector from Primary to Secondary
+                    # P + T = S  => T = S - P
                     # Let's take midpoint of boundary
                     mid_s = (b.points[0] + b.points[1]) / 2.0
-                    mid_m = (b.pair.points[0] + b.pair.points[1]) / 2.0
-                    trans = mid_s - mid_m
+                    mid_p = (b.pair.points[0] + b.pair.points[1]) / 2.0
+                    trans = mid_s - mid_p
 
                     translation = [
                         1,
@@ -297,26 +298,26 @@ class GmshMesher:
                         1,
                     ]
 
-                    if slave_tags and master_tags:
-                        matched_slave, matched_master = (
+                    if secondary_tags and primary_tags:
+                        matched_secondary, matched_primary = (
                             self._get_periodic_boundary_mapping(
-                                slave_tags, master_tags, translation
+                                secondary_tags, primary_tags, translation
                             )
                         )
 
-                        if matched_slave:
-                            if len(matched_slave) != len(slave_tags) or len(
-                                matched_master
-                            ) != len(master_tags):
+                        if matched_secondary:
+                            if len(matched_secondary) != len(secondary_tags) or len(
+                                matched_primary
+                            ) != len(primary_tags):
                                 print(
-                                    f"Warning: Partial periodic match for boundary {b.index} vs {b.pair.index}. Matched {len(matched_slave)} segments."
+                                    f"Warning: Partial periodic match for boundary {b.index} vs {b.pair.index}. Matched {len(matched_secondary)} segments."
                                 )
                                 print(
-                                    f"  Total Slave: {len(slave_tags)}, Total Master: {len(master_tags)}"
+                                    f"  Total Secondary: {len(secondary_tags)}, Total Primary: {len(primary_tags)}"
                                 )
 
                             gmsh.model.mesh.setPeriodic(
-                                1, matched_slave, matched_master, translation
+                                1, matched_secondary, matched_primary, translation
                             )
                         else:
                             print(
@@ -335,14 +336,16 @@ class GmshMesher:
 
         gmsh.model.mesh.generate(2)
 
-        if check_periodicity:
-            self._check_periodicity(boundaries, boundary_line_map)
-
         if visualize_gui:
             gmsh.fltk.run()
 
         gmsh.write(self.mesh_name + ".msh")
         gmsh.write(self.mesh_name + ".vtk")
+
+        if check_periodicity:
+            self._check_periodicity(
+                boundaries, boundary_line_map, boundary_dist_tolerance
+            )
 
         gmsh.finalize()
 
@@ -364,101 +367,161 @@ class GmshMesher:
         dist = np.linalg.norm(np.array(point_3d[:2]) - fiber.center)
         return dist < fiber.radius * (1.0 - 1e-6)
 
-    def _check_periodicity(self, boundaries, boundary_line_map):
-        """Verifies that nodes on periodic boundaries match up."""
+    def _check_periodicity(self, boundaries, boundary_line_map, tolerance):
+        """Verifies that nodes on periodic boundaries match up.
+
+        Parameters
+        ----------
+        boundaries : List[LinearBoundary]
+            List of boundaries to check.
+        boundary_line_map : dict
+            Mapping from boundaries to curve tags.
+        tolerance : float
+            Distance tolerance for node matching.
+        """
         for b in boundaries:
             if b.type == BoundaryType.PERIODIC and b.pair is not None:
                 # Ensure we only check once per pair
                 if hasattr(b, "index") and b.index < b.pair.index:
-                    slave_tags = boundary_line_map[b]
-                    master_tags = boundary_line_map[b.pair]
+                    secondary_tags = boundary_line_map[b]
+                    primary_tags = boundary_line_map[b.pair]
 
-                    if not slave_tags or not master_tags:
+                    if not secondary_tags or not primary_tags:
                         continue
 
                     # Calculate translation
                     mid_s = (b.points[0] + b.points[1]) / 2.0
-                    mid_m = (b.pair.points[0] + b.pair.points[1]) / 2.0
-                    trans = mid_s - mid_m
+                    mid_p = (b.pair.points[0] + b.pair.points[1]) / 2.0
+                    trans = mid_s - mid_p
 
                     # Get nodes
-                    slave_nodes = set()
-                    for t in slave_tags:
-                        _, coords, _ = gmsh.model.mesh.getNodes(
+                    secondary_node_tags = []
+                    secondary_coords = []
+                    for t in secondary_tags:
+                        node_tags, coords, _ = gmsh.model.mesh.getNodes(
                             1, t, includeBoundary=True
                         )
+                        secondary_node_tags.extend(node_tags)
                         for i in range(0, len(coords), 3):
-                            slave_nodes.add(tuple(np.round(coords[i : i + 3], 6)))
+                            secondary_coords.append(coords[i : i + 3])
 
-                    master_nodes = set()
-                    for t in master_tags:
-                        _, coords, _ = gmsh.model.mesh.getNodes(
+                    primary_node_tags = []
+                    primary_coords = []
+                    for t in primary_tags:
+                        node_tags, coords, _ = gmsh.model.mesh.getNodes(
                             1, t, includeBoundary=True
                         )
+                        primary_node_tags.extend(node_tags)
                         for i in range(0, len(coords), 3):
-                            # Apply translation to master nodes to see if they match slave locations
+                            # Apply translation to primary nodes
                             p = np.array(coords[i : i + 3])
                             p[0] += trans[0]
                             p[1] += trans[1]
-                            master_nodes.add(tuple(np.round(p, 6)))
+                            primary_coords.append(p)
 
-                    # Check symmetry
-                    # Note: Set difference is direction sensitive. Check both ways or equality.
-                    if slave_nodes != master_nodes:
-                        diff1 = slave_nodes - master_nodes
-                        diff2 = master_nodes - slave_nodes
+                    primary_node_tags = np.array(primary_node_tags)
+                    secondary_node_tags = np.array(secondary_node_tags)
+
+                    if not secondary_coords or not primary_coords:
+                        continue
+
+                    # Robust comparison using KDTree
+                    secondary_coords = np.array(secondary_coords)
+                    primary_coords = np.array(primary_coords)
+
+                    tree = KDTree(secondary_coords)
+                    # Query distances to nearest neighbors
+                    dists, closest_indices = tree.query(primary_coords, k=1)
+
+                    unmatched_indices = np.where(dists > tolerance)[0]
+
+                    if len(unmatched_indices) > 0:
+                        max_msg = (
+                            f"Max discrepancy: {np.max(dists[unmatched_indices]):.2e}"
+                        )
+
+                        unmatched_primary_tags = primary_node_tags[unmatched_indices]
+                        unmatched_closest_indices = closest_indices[unmatched_indices]
+                        unmatched_secondary_tags = secondary_node_tags[
+                            unmatched_closest_indices
+                        ]
+
+                        # Show up to 10 unmatched nodes for diagnostic purposes
+                        num_show = 10
+                        unmatched_details = []
+                        for i in range(min(num_show, len(unmatched_indices))):
+                            idx = unmatched_indices[i]
+                            p_tag = unmatched_primary_tags[i]
+                            s_tag = unmatched_secondary_tags[i]
+                            dist = dists[idx]
+                            unmatched_details.append(
+                                f"  Primary Tag {p_tag} -> Closest Secondary Tag {s_tag} (dist: {dist:.2e})"
+                            )
+
+                        unmatched_str = "\n".join(unmatched_details)
+                        if len(unmatched_indices) > num_show:
+                            unmatched_str += (
+                                f"\n  ... and {len(unmatched_indices) - num_show} more."
+                            )
+
                         raise RuntimeError(
                             f"Periodic mesh verification failed for boundary {b.index} vs {b.pair.index}.\n"
-                            f"Unmatched Slave Nodes: {len(diff1)}\n"
-                            f"Unmatched Master Nodes: {len(diff2)}"
+                            f"Total # of Primary Nodes: {len(primary_coords)}\n"
+                            f"Total # of Unmatched Nodes (dist > {tolerance}): {len(unmatched_indices)}\n"
+                            f"{max_msg}\n"
+                            f"Unmatched Node Details:\n{unmatched_str}"
                         )
                     else:
+                        avg_dist = np.mean(dists) if len(dists) > 0 else 0
                         print(
-                            f"Periodic check passed for boundary {b.index} <-> {b.pair.index}"
+                            f"Periodic check passed (KDTree) for boundary {b.index} <-> {b.pair.index} (avg dist: {avg_dist:.2e})"
                         )
 
     def _get_periodic_boundary_mapping(
-        self, slave_tags: List[int], master_tags: List[int], translation: List[float]
+        self,
+        secondary_tags: List[int],
+        primary_tags: List[int],
+        translation: List[float],
     ) -> Tuple[List[int], List[int]]:
-        """Finds a 1-to-1 mapping between slave and master curve segments based on CoM.
+        """Finds a 1-to-1 mapping between secondary and primary curve segments based on CoM.
 
         Parameters
         ----------
-        slave_tags : List[int]
-            List of curve tags on the slave boundary.
-        master_tags : List[int]
-            List of curve tags on the master boundary.
+        secondary_tags : List[int]
+            List of curve tags on the secondary boundary.
+        primary_tags : List[int]
+            List of curve tags on the primary boundary.
         translation : List[float]
             The 16-element transformation matrix (GMSH format).
 
         Returns
         -------
         Tuple[List[int], List[int]]
-            A tuple of (matched_slave_tags, matched_master_tags).
+            A tuple of (matched_secondary_tags, matched_primary_tags).
         """
-        matched_slave = []
-        matched_master = []
-        remaining_masters = list(master_tags)
+        matched_secondary = []
+        matched_primary = []
+        remaining_primaries = list(primary_tags)
         trans_vec = np.array(translation[3:12:4])  # Extract [tx, ty, tz]
 
-        # In GMSH: Slave = Master + Translation, so Master = Slave - Translation
-        for s_tag in slave_tags:
+        # In GMSH: Secondary = Primary + Translation, so Primary = Secondary - Translation
+        for s_tag in secondary_tags:
             s_com = np.array(gmsh.model.occ.getCenterOfMass(1, s_tag))
-            expected_m_com = s_com - trans_vec
+            expected_p_com = s_com - trans_vec
 
             best_idx = -1
             min_dist = 1e-6  # Tolerance
 
-            for i, m_tag in enumerate(remaining_masters):
-                m_com = np.array(gmsh.model.occ.getCenterOfMass(1, m_tag))
-                dist = np.linalg.norm(m_com - expected_m_com)
+            for i, p_tag in enumerate(remaining_primaries):
+                p_com = np.array(gmsh.model.occ.getCenterOfMass(1, p_tag))
+                dist = np.linalg.norm(p_com - expected_p_com)
                 if dist < min_dist:
                     min_dist = dist
                     best_idx = i
 
             if best_idx != -1:
-                matched_slave.append(s_tag)
-                matched_master.append(remaining_masters[best_idx])
-                remaining_masters.pop(best_idx)
+                matched_secondary.append(s_tag)
+                matched_primary.append(remaining_primaries[best_idx])
+                remaining_primaries.pop(best_idx)
 
-        return matched_slave, matched_master
+        return matched_secondary, matched_primary

@@ -58,7 +58,10 @@ def square_periodic_example():
     # Test Meshing
     try:
         rve.create_mesh(
-            mesh_name="test_mesh", mesh_size_factor=1e-6, check_periodicity=True
+            mesh_name="test_mesh",
+            mesh_size_factor=1e-6,
+            check_periodicity=True,
+            visualize_gui=True,
         )
         print("Meshing call completed (check output files).")
     except Exception as e:

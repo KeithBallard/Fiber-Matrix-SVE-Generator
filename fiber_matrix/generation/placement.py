@@ -5,7 +5,7 @@ import numpy as np
 from scipy import spatial
 from typing import List, Tuple, Optional, Callable, Any
 from fiber_matrix.models.boundary import LinearBoundary
-from fiber_matrix.models.fiber import Fiber, PeriodicMasterFiber, PeriodicGhostFiber
+from fiber_matrix.models.fiber import Fiber, PeriodicPrimaryFiber, PeriodicGhostFiber
 
 
 class FiberPlacementSolver:
@@ -16,12 +16,12 @@ class FiberPlacementSolver:
 
     def solve_fiber_locations(
         self,
-        fibers: List[PeriodicMasterFiber],
+        fibers: List[PeriodicPrimaryFiber],
         boundaries: List[LinearBoundary],
         min_spacing_ratio: float,
         iterations_max: int = 10000,
         iteration_callback: Optional[
-            Callable[[int, List[PeriodicMasterFiber], List[LinearBoundary]], None]
+            Callable[[int, List[PeriodicPrimaryFiber], List[LinearBoundary]], None]
         ] = None,
     ) -> None:
         """
@@ -29,7 +29,7 @@ class FiberPlacementSolver:
 
         Parameters
         ----------
-        fibers : List[PeriodicMasterFiber]
+        fibers : List[PeriodicPrimaryFiber]
             List of fibers to overlap resolve.
         boundaries : List[LinearBoundary]
             List of RVE boundaries for constraints.
@@ -101,7 +101,7 @@ class FiberPlacementSolver:
 
     def _recalculate_neighbors(
         self,
-        fibers: List[PeriodicMasterFiber],
+        fibers: List[PeriodicPrimaryFiber],
         boundaries: List[LinearBoundary],
         fiber_diams_to_search: float,
     ):
@@ -109,8 +109,8 @@ class FiberPlacementSolver:
 
         Parameters
         ----------
-        fibers : List[PeriodicMasterFiber]
-            List of master fibers.
+        fibers : List[PeriodicPrimaryFiber]
+            List of primary fibers.
         boundaries : List[LinearBoundary]
             List of boundaries for ghost generation.
         fiber_diams_to_search : float
@@ -132,7 +132,7 @@ class FiberPlacementSolver:
 
     def _iterate_on_interference(
         self,
-        fibers: List[PeriodicMasterFiber],
+        fibers: List[PeriodicPrimaryFiber],
         boundaries: List[LinearBoundary],
         min_space_between_fibers: float,
     ) -> bool:
@@ -140,7 +140,7 @@ class FiberPlacementSolver:
 
         Parameters
         ----------
-        fibers : List[PeriodicMasterFiber]
+        fibers : List[PeriodicPrimaryFiber]
             List of fibers to check.
         boundaries : List[LinearBoundary]
             Boundaries to respect during movement.

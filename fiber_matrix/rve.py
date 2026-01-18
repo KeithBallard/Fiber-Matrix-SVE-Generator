@@ -9,7 +9,7 @@ except ImportError:
     plt = None
 
 from .models.boundary import LinearBoundary, BoundaryType
-from .models.fiber import Fiber, PeriodicMasterFiber
+from .models.fiber import Fiber, PeriodicPrimaryFiber
 from .generation.placement import FiberPlacementSolver
 from .meshing.gmsh_mesher import GmshMesher
 from .visualization import plotting
@@ -23,7 +23,7 @@ class FiberRVE:
     """
 
     def __init__(self):
-        self.fibers: List[PeriodicMasterFiber] = []
+        self.fibers: List[PeriodicPrimaryFiber] = []
         self.boundaries: List[LinearBoundary] = []
         self.fiber_vf: float = 0.0
         self.radii: List[float] = []
@@ -187,7 +187,7 @@ class FiberRVE:
         for i in range(num_fibers):
             r = self.radii[i]
             c = np.array(specified_fiber_centers[i])
-            f = PeriodicMasterFiber(c, r, i, self.boundaries)
+            f = PeriodicPrimaryFiber(c, r, i, self.boundaries)
             self.fibers.append(f)
 
         for fiber in self.fibers:
@@ -299,7 +299,7 @@ class FiberRVE:
             self.draw()
 
     def get_fiber_centers(self) -> List[np.ndarray]:
-        """Returns the current centers of all master fibers.
+        """Returns the current centers of all primary fibers.
 
         Returns
         -------

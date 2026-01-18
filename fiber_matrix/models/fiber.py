@@ -105,19 +105,19 @@ class Fiber:
         and will move it if necessary.
         """
         # This method needs to be implemented in subclasses or here,
-        # but in the original code it was implemented in PeriodicMasterFiber (mostly)
+        # but in the original code it was implemented in PeriodicPrimaryFiber (mostly)
         # and called on fibers.
         # Base Fiber doesn't actually implement detailed adjust_for_bounds in the original code?
         # Checking original code...
         # Original Fiber class has `fix_overlap_with_neighbors` but `adjust_for_bounds` is not in Fiber.
         # But `fix_overlap_with_neighbors` does call `self.adjust_for_bounds(boundaries)`.
         # Wait, the original `Fiber` class does NOT have `adjust_for_bounds`.
-        # Only `PeriodicMasterFiber` and `PeriodicGhostFiber` have it.
+        # Only `PeriodicPrimaryFiber` and `PeriodicGhostFiber` have it.
         # So we should probably make it abstract or implement it if useful.
         pass
 
 
-class PeriodicMasterFiber(Fiber):
+class PeriodicPrimaryFiber(Fiber):
     """A class for storing a fiber that is in the RVE domain."""
 
     def __init__(
@@ -236,11 +236,11 @@ class PeriodicMasterFiber(Fiber):
         for i in valid_indices:
             other = fibers_with_ghosts[i]
             # Check logic from original: neighbors should have higher index to avoid double checking pairs
-            if isinstance(other, PeriodicMasterFiber):
+            if isinstance(other, PeriodicPrimaryFiber):
                 if other.index > self.index:
                     self.neighbors.add(other)
             elif isinstance(other, PeriodicGhostFiber):
-                if other.master_fiber.index > self.index:
+                if other.primary_fiber.index > self.index:
                     self.neighbors.add(other)
 
         for gf in self.ghost_fibers:
@@ -263,19 +263,19 @@ class PeriodicMasterFiber(Fiber):
 
 class PeriodicGhostFiber(Fiber):
     def __init__(
-        self, center: np.ndarray, radius: float, master_fiber: PeriodicMasterFiber
+        self, center: np.ndarray, radius: float, primary_fiber: PeriodicPrimaryFiber
     ):
         super().__init__(center, radius)
-        self.master_fiber = master_fiber
+        self.primary_fiber = primary_fiber
 
     def move(self, move_vec: np.ndarray):
-        self.master_fiber.move(move_vec)
+        self.primary_fiber.move(move_vec)
 
     def move_actual(self, move_vec: np.ndarray):
         super().move(move_vec)
 
     def adjust_for_bounds(self, boundaries: List[LinearBoundary], eps=5.0e-2):
-        self.master_fiber.adjust_for_bounds(boundaries, eps)
+        self.primary_fiber.adjust_for_bounds(boundaries, eps)
 
     def update_neighbors(
         self,
@@ -296,9 +296,9 @@ class PeriodicGhostFiber(Fiber):
 
         for i in valid_indices:
             other = fibers_with_ghosts[i]
-            if isinstance(other, PeriodicMasterFiber):
-                if other.index > self.master_fiber.index:
+            if isinstance(other, PeriodicPrimaryFiber):
+                if other.index > self.primary_fiber.index:
                     self.neighbors.add(other)
             elif isinstance(other, PeriodicGhostFiber):
-                if other.master_fiber.index > self.master_fiber.index:
+                if other.primary_fiber.index > self.primary_fiber.index:
                     self.neighbors.add(other)
