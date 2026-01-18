@@ -176,7 +176,6 @@ class GmshMesher:
             fiber_disks.append(add_fiber_disk(f))
             for g in f.ghost_fibers:
                 fiber_disks.append(add_fiber_disk(g))
-                print(g.center)
 
         gmsh.model.occ.synchronize()
 
@@ -221,42 +220,28 @@ class GmshMesher:
         if visualize_gui:
             gmsh.fltk.run()
 
-        # 5. Identity Matrix vs Fibers
-        final_fiber_tags = []
-        final_matrix_tags = []
+        # 5. Identify Matrix vs Fibers
+        # use out_dimtags_map from fragment operation to trace lineage.
 
-        surfaces = gmsh.model.getEntities(2)
+        # Collect all tags that come from the fiber inputs
+        fiber_surface_tags = set()
+        # Inputs to fragment: [rve_dimtag] + clipped_fibers_dimtags
+        # Index 0 is RVE. Indices 1..N are Fibers.
 
-        for s in surfaces:
-            tag = s[1]
-            com = gmsh.model.occ.getCenterOfMass(2, tag)
+        for i in range(len(clipped_fibers_dimtags)):
+            # Map index is 1 + i
+            generated_dimtags = out_dimtags_map[1 + i]
+            for dt in generated_dimtags:
+                fiber_surface_tags.add(dt[1])
 
-            # Check if inside RVE (using boundary logic)
-            is_inside_rve = True
-            for b in boundaries:
-                # Assuming boundaries define the "inside" to be on one side (cross product < 0 or > 0 depending on winding)
-                # The provided `get_point_relative_position` assumes winding order.
-                # Assuming simple convex polygon/rectangle.
-                if b.get_point_relative_position(np.array(com[:2])) < -1e-6:
-                    is_inside_rve = False
-                    break
+        # Collect all tags that come from the RVE input
+        rve_related_tags = set()
+        for dt in out_dimtags_map[0]:
+            rve_related_tags.add(dt[1])
 
-            if not is_inside_rve:
-                gmsh.model.occ.remove([(2, tag)], recursive=True)
-                continue
-
-            is_fiber = False
-            for f in fibers:
-                if self._is_inside_fiber(com, f) or any(
-                    self._is_inside_fiber(com, g) for g in f.ghost_fibers
-                ):
-                    is_fiber = True
-                    break
-
-            if is_fiber:
-                final_fiber_tags.append(tag)
-            else:
-                final_matrix_tags.append(tag)
+        # Matrix surfaces are those in RVE lineage that are NOT in Fiber lineage
+        final_matrix_tags = list(rve_related_tags - fiber_surface_tags)
+        final_fiber_tags = list(fiber_surface_tags)
 
         gmsh.model.occ.synchronize()
 

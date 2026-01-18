@@ -220,25 +220,80 @@ class FiberRVE:
         """
         solver = FiberPlacementSolver()
 
-        callback = None
-        if visualize:
-            import shutil
-            import os
+        solver = FiberPlacementSolver()
 
-            if os.path.exists("frames"):
-                shutil.rmtree("frames")
+        # Visualization setup
+        captured_frames = []
+        fig = None
+        ax = None
 
-            # Use a mutable container for frame counter if needed, or just use iteration count
-            # The solver passes iteration count.
+        if visualize and plt is not None:
+            # Create a single figure for the animation
+            fig, ax = plt.subplots(figsize=(6, 6))
+
             def plot_callback(iteration, fibers, boundaries):
-                # We can reuse self.draw, but we need to ensure it saves using the iteration number
-                self.draw(frame=iteration)
+                # Update the existing plot
+                self.draw(fig=fig, ax=ax, frame=None)
+
+                # Force draw to update canvas
+                fig.canvas.draw()
+
+                # Capture the frame from buffer
+                # Note: safe approach for different backends
+                try:
+                    from PIL import Image
+
+                    w, h = fig.canvas.get_width_height()
+                    # buffer_rgba() returns a memoryview of the RGBA buffer
+                    buf = fig.canvas.buffer_rgba()
+                    image = Image.frombuffer("RGBA", (w, h), buf).convert("RGB")
+                    captured_frames.append(image)
+                except ImportError:
+                    print("PIL (Pillow) not found. Cannot save GIF.")
+                except AttributeError:
+                    # Fallback for older matplotlib or different backends
+                    try:
+                        buf = fig.canvas.tostring_rgb()
+                        image = Image.frombytes("RGB", (w, h), buf)
+                        captured_frames.append(image)
+                    except Exception as e:
+                        print(f"Error capturing frame (fallback failed): {e}")
+                except Exception as e:
+                    print(f"Error capturing frame: {e}")
 
             callback = plot_callback
+        elif visualize:
+            print("Matplotlib not installed. Visualization disabled.")
+            callback = None
 
-        solver.solve_fiber_locations(
-            self.fibers, self.boundaries, min_spacing_ratio, iteration_callback=callback
-        )
+        try:
+            solver.solve_fiber_locations(
+                self.fibers,
+                self.boundaries,
+                min_spacing_ratio,
+                iteration_callback=callback,
+            )
+        finally:
+            # Save GIF if we have frames
+            if captured_frames:
+                try:
+                    captured_frames[0].save(
+                        "RVE_solver_visualization.gif",
+                        save_all=True,
+                        append_images=captured_frames[1:],
+                        optimize=False,
+                        duration=200,  # ms per frame
+                        loop=0,
+                    )
+                    print(
+                        f"Animation saved to 'RVE_solver_visualization.gif' ({len(captured_frames)} frames)."
+                    )
+                except Exception as e:
+                    print(f"Failed to save GIF: {e}")
+
+            # Explicitly close the figure to avoid RuntimeWarning
+            if fig is not None:
+                plt.close(fig)
 
         if show_final:
             self.draw()
