@@ -339,7 +339,11 @@ class FiberRVE:
     # ---------------------
 
     def create_mesh(
-        self, mesh_name="FiberMatrixRVE", mesh_size_factor=1.0, visualize_gui=False
+        self,
+        mesh_name="FiberMatrixRVE",
+        mesh_size_factor=1.0,
+        visualize_gui=False,
+        check_periodicity=False,
     ):
         """Generates a mesh for the current RVE configuration using GMSH.
 
@@ -351,8 +355,14 @@ class FiberRVE:
             Global scaling factor for mesh element size. Default 1.0.
         visualize_gui : bool, optional
             If True, opens the GMSH GUI to visualize the mesh after generation. Default False.
+        check_periodicity : bool, optional
+            If True, asserts that the generated mesh nodes on periodic boundaries match. Default False.
         """
         mesher = GmshMesher(mesh_name)
         mesher.create_mesh(
-            self.fibers, self.boundaries, mesh_size_factor, visualize_gui
+            self.fibers,
+            self.boundaries,
+            mesh_size_factor,
+            visualize_gui,
+            check_periodicity,
         )
