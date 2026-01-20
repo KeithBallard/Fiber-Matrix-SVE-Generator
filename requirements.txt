@@ -1,0 +1,11 @@
+# Core Dependencies
+numpy
+scipy
+gmsh
+matplotlib
+Pillow
+
+# Documentation Dependencies
+mkdocs
+mkdocs-material
+mkdocstrings[python]

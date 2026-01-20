@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fiber-matrix-sve-generator"
+version = "0.1.0"
+description = "A Python library for generating Representative Volume Elements (RVEs) of fiber-reinforced composites."
+readme = "README.md"
+requires-python = ">=3.8"
+license = "Apache-2.0"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "gmsh",
+    "matplotlib",
+    "Pillow",
+]
+
+[project.optional-dependencies]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["fiber_matrix*"]
+
+[project.urls]
+"Source" = "https://gitlab.dle.afrl.af.mil:rx/mesh-generation/fiber-matrix-sve-generator.git"

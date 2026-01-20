@@ -1,6 +1,20 @@
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+
+# Project specific
 frames/
-__pycache__
-docs/
 site/
-tests/test_mesh.msh
-tests/test_mesh.vtk
+tests/*.msh
+tests/*.vtk
+tests/*.png
+tests/*.gif

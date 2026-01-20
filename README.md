@@ -33,8 +33,24 @@ pip install numpy scipy matplotlib gmsh
 
 For building documentation:
 ```bash
-pip install mkdocs mkdocs-material mkdocstrings[python]
+pip install .[docs]
 ```
+
+## Packaging
+
+To build the library as a `.whl` (wheel) file for distribution:
+
+1. Ensure you have `build` installed:
+   ```bash
+   pip install build
+   ```
+
+2. Run the build command:
+   ```bash
+   python -m build
+   ```
+
+The output `.whl` and `.tar.gz` files will be located in the `dist/` directory.
 
 ## Quick Start
 
@@ -108,4 +124,4 @@ Then open your browser to `http://127.0.0.1:8000`.
 
 ## License
 
-[MIT](LICENSE)
+[Apache 2.0](LICENSE)

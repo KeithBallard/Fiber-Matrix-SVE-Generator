@@ -220,8 +220,6 @@ class FiberRVE:
         """
         solver = FiberPlacementSolver()
 
-        solver = FiberPlacementSolver()
-
         # Visualization setup
         captured_frames = []
         fig = None
