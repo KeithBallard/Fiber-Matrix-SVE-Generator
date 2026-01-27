@@ -20,6 +20,7 @@ dependencies = [
     "gmsh",
     "matplotlib",
     "Pillow",
+    "triangle",
 ]
 
 [project.optional-dependencies]

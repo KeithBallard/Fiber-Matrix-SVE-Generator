@@ -4,6 +4,7 @@ scipy
 gmsh
 matplotlib
 Pillow
+triangle
 
 # Documentation Dependencies
 mkdocs

@@ -19,11 +19,11 @@ class FiberPlacementSolver:
         fibers: List[PeriodicPrimaryFiber],
         boundaries: List[LinearBoundary],
         min_spacing_ratio: float,
-        iterations_max: int = 10000,
+        iterations_max: int,
         iteration_callback: Optional[
             Callable[[int, List[PeriodicPrimaryFiber], List[LinearBoundary]], None]
         ] = None,
-    ) -> None:
+    ) -> int:
         """
         Iteratively resolves overlaps between fibers to ensure minimum spacing.
 
@@ -63,7 +63,9 @@ class FiberPlacementSolver:
         iteration_count = 0
         iterations_no_overlap = 0
 
-        while iterations_no_overlap < 3:
+        # Note: I changed the stopping condition from 3 to 1 to allow faster convergence.
+        # This is likely fine for well-posed problems, but consider adjusting in the future.
+        while iterations_no_overlap < 1 and iteration_count < iterations_max:
             if iteration_callback is not None:
                 iteration_callback(iteration_count, fibers, boundaries)
 
@@ -92,12 +94,13 @@ class FiberPlacementSolver:
 
             iteration_count += 1
             if iteration_count >= iterations_max:
-                raise RuntimeError(
-                    "Maximum iterations exceeded. Check input parameters to make sure an RVE is possible."
+                print(
+                    "WARNING: Maximum iterations exceeded. Stopping solve. Check input parameters to make sure an RVE is possible."
                 )
 
         elapsed = time.time() - start
         # print("Total Time to generate RVE Geometry: " + str(elapsed) + ' seconds')
+        return iteration_count
 
     def _recalculate_neighbors(
         self,

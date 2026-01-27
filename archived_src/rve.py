@@ -148,7 +148,7 @@ class FiberRVE(object):
 
     def place_initial_fibers(self,
         specified_fiber_centers=[],
-        plot_triangulization=False):
+        plot_triangulation=False):
         """TODO
         Returns tuple (Vf, RVE_area)
         """
@@ -163,7 +163,7 @@ class FiberRVE(object):
         tri_in['segments'].append([len(points)-1, 0])
         self.triangulation = triangulate(tri_in, 'p')
 
-        if plot_triangulization:
+        if plot_triangulation:
             for t in self.triangulation['triangles']:
                 # t[0], t[1], t[2] are the points indexes of the triangle
                 t_i = [t[0], t[1], t[2], t[0]]

@@ -14,7 +14,5 @@ __pycache__/
 # Project specific
 frames/
 site/
-tests/*.msh
-tests/*.vtk
-tests/*.png
-tests/*.gif
+examples/output
+tests/output

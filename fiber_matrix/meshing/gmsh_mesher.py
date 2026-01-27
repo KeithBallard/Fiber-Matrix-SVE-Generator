@@ -86,7 +86,7 @@ class GmshMesher:
 
         # Boolean operations require the points to be sufficiently large in magnitude
         rve_extent = np.linalg.norm(
-            np.max(all_b_points, axis=1) - np.min(all_b_points, axis=1)
+            np.max(all_b_points, axis=0) - np.min(all_b_points, axis=0)
         )
         scale_factor = 1.0 / rve_extent
 
@@ -208,6 +208,12 @@ class GmshMesher:
         out_dimtags, out_dimtags_map = gmsh.model.occ.fragment(
             [rve_dimtag], clipped_fibers_dimtags
         )
+
+        if not out_dimtags_map:
+            raise RuntimeError(
+                f"GMSH Fragment operation returned empty map. "
+                f"rve_dimtag={rve_dimtag}, # clipped_fibers={len(clipped_fibers_dimtags)}"
+            )
 
         # Now that boolean operations are done, we can scale the geometry back to its original size.
         gmsh.model.occ.dilate(

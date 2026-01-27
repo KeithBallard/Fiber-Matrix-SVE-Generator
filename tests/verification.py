@@ -1,17 +1,23 @@
 import sys
 import os
+from pathlib import Path
+import numpy as np
 
 # Add parent directory to sys.path to allow importing fiber_matrix
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import numpy as np
+sys.path.append(Path(__file__).parent.parent.as_posix())
 from fiber_matrix import FiberRVE
 
 
 def square_periodic_example():
+    # Set to False to disable GUI windows from popping up
+    show_guis = False
+
     # Ensure we load data relative to this script's location
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    os.chdir(base_dir)  # Change CWD to tests/ so outputs go there
+    base_dir = Path(__file__).parent
+    # Change working directory to a folder for output
+    output_dir = base_dir / "output"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    os.chdir(output_dir)
 
     rve = FiberRVE()
     rve.initialize_rectangle_rve(
@@ -36,7 +42,9 @@ def square_periodic_example():
     initial_centers_list = initial_fiber_centers.tolist()
 
     rve.place_initial_fibers(specified_fiber_centers=initial_centers_list)
-    rve.solve_fiber_locations(min_spacing_ratio=0.1, visualize=True)
+    rve.solve_fiber_locations(
+        min_spacing_ratio=0.1, visualization_path=Path(__file__).stem + ".gif"
+    )
 
     final_fiber_centers = np.load(
         os.path.join(base_dir, "test_final_fiber_centers.npy")
@@ -61,7 +69,7 @@ def square_periodic_example():
             mesh_name="test_mesh",
             mesh_size_factor=1e-6,
             check_periodicity=True,
-            visualize_gui=True,
+            visualize_gui=show_guis,
         )
         print("Meshing call completed (check output files).")
     except Exception as e:

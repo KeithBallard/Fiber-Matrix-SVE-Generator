@@ -104,17 +104,34 @@ class Fiber:
         """Checks to make sure this fiber does not violate any specified boundaries
         and will move it if necessary.
         """
-        # This method needs to be implemented in subclasses or here,
-        # but in the original code it was implemented in PeriodicPrimaryFiber (mostly)
-        # and called on fibers.
-        # Base Fiber doesn't actually implement detailed adjust_for_bounds in the original code?
-        # Checking original code...
-        # Original Fiber class has `fix_overlap_with_neighbors` but `adjust_for_bounds` is not in Fiber.
-        # But `fix_overlap_with_neighbors` does call `self.adjust_for_bounds(boundaries)`.
-        # Wait, the original `Fiber` class does NOT have `adjust_for_bounds`.
-        # Only `PeriodicPrimaryFiber` and `PeriodicGhostFiber` have it.
-        # So we should probably make it abstract or implement it if useful.
-        pass
+        for boundary in boundaries:
+            if boundary.type == BoundaryType.FINITE and boundary.check_collision(
+                self.center, self.radius, eps
+            ):
+                move_vector = boundary.get_move_vector()
+                distance_to_center = boundary.get_distance_to_fiber(self.center)
+                self.center = (
+                    self.center
+                    + abs(distance_to_center - (1.0 + eps) * self.radius) * move_vector
+                )
+
+            if boundary.type == BoundaryType.SYMMETRIC and boundary.check_collision(
+                self.center, self.radius, eps
+            ):
+                move_vector = boundary.get_move_vector()
+                distance_to_center = boundary.get_distance_to_fiber(self.center)
+                if distance_to_center < self.radius / 2.0:
+                    self.center = (
+                        self.center
+                        - abs(distance_to_center - (1.0 + eps) * self.radius)
+                        * move_vector
+                    )
+                else:
+                    self.center = (
+                        self.center
+                        + abs(distance_to_center - (1.0 + eps) * self.radius)
+                        * move_vector
+                    )
 
 
 class PeriodicPrimaryFiber(Fiber):
@@ -170,34 +187,7 @@ class PeriodicPrimaryFiber(Fiber):
             )
 
     def adjust_for_bounds(self, boundaries: List[LinearBoundary], eps=5.0e-2):
-        for boundary in boundaries:
-            if boundary.type == BoundaryType.FINITE and boundary.check_collision(
-                self.center, self.radius, eps
-            ):
-                move_vector = boundary.get_move_vector()
-                distance_to_center = boundary.get_distance_to_fiber(self.center)
-                self.center = (
-                    self.center
-                    + abs(distance_to_center - (1.0 + eps) * self.radius) * move_vector
-                )
-
-            if boundary.type == BoundaryType.SYMMETRIC and boundary.check_collision(
-                self.center, self.radius, eps
-            ):
-                move_vector = boundary.get_move_vector()
-                distance_to_center = boundary.get_distance_to_fiber(self.center)
-                if distance_to_center < self.radius / 2.0:
-                    self.center = (
-                        self.center
-                        - abs(distance_to_center - (1.0 + eps) * self.radius)
-                        * move_vector
-                    )
-                else:
-                    self.center = (
-                        self.center
-                        + abs(distance_to_center - (1.0 + eps) * self.radius)
-                        * move_vector
-                    )
+        super().adjust_for_bounds(boundaries, eps)
 
     def move(self, move_vec: np.ndarray):
         super().move(move_vec)
