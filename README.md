@@ -13,7 +13,8 @@ A Python library for generating Representative Volume Elements (RVEs) of fiber-r
 - **Robust Meshing**:
   - Unstructured meshing via GMSH Python API.
   - Robust boolean operations (Cut/Intersect) handling periodic boundaries.
-  - Automatic physical group tagging (Matrix, Fibers, Boundaries).
+  - 2D surface meshes and extruded 3D volume meshes.
+  - Automatic physical group tagging for Matrix, Fibers, and optional material-specific 3D boundary surfaces.
 - **Visualization**:
   - Real-time visualization of fiber packing convergence.
   - Matplotlib plotting of RVE geometry.
@@ -88,7 +89,55 @@ rve.create_mesh(
 print("Mesh generated: my_composite_rve.msh")
 ```
 
-### 2. Visualize Results
+### 2. Generate a 3D Volume Mesh
+
+The 2D RVE geometry can also be extruded into a 3D volume mesh. For a cubic
+RVE, use the generated square RVE width as the extrusion thickness.
+
+```python
+from fiber_matrix.rve import FiberRVE
+
+rve = FiberRVE()
+rve.initialize_rectangle_rve(
+    num_fibers=20,
+    vf=0.45,
+    avg_diam=5.0,
+    rve_aspect_ratio=1.0
+)
+
+iterations = rve.solve_fiber_locations(
+    min_spacing_ratio=0.1,
+    visualization_path="my_composite_rve_3d.gif"
+)
+print(f"Solved in {iterations} iterations.")
+
+rve.create_3d_mesh(
+    mesh_name="my_composite_rve_3d",
+    thickness=rve.rve_dims[0],
+    mesh_size_factor=1.0,
+    z_layers=16,
+    visualize_gui=False,
+    check_periodicity=True,
+    periodic_z=False,
+    surface_groups=True,
+)
+print("3D mesh generated: my_composite_rve_3d.msh")
+```
+
+When `surface_groups=True`, the 3D mesh includes volume groups named `Matrix`
+and `Fibers`, plus material-specific physical surface groups:
+
+```text
+Matrix_Left    Matrix_Right    Matrix_Bottom
+Matrix_Top     Matrix_Front    Matrix_Back
+Fibers_Left    Fibers_Right    Fibers_Bottom
+Fibers_Top     Fibers_Front    Fibers_Back
+```
+
+Use `mesh_size_factor` to control the in-plane element size and `z_layers` to
+control refinement through the extrusion direction.
+
+### 3. Visualize Results
 
 You can visualize the generated geometry using the built-in plotting tools or optional callbacks.
 
