@@ -13,6 +13,7 @@ from .models.boundary import LinearBoundary, BoundaryType
 from .models.fiber import Fiber, PeriodicPrimaryFiber
 from .generation.placement import FiberPlacementSolver
 from .meshing.gmsh_mesher import GmshMesher
+from .meshing.gmsh_mesher_3d import GmshMesher3D
 from .visualization import plotting
 
 try:
@@ -513,4 +514,54 @@ class FiberRVE:
             mesh_size_factor,
             visualize_gui,
             check_periodicity,
+        )
+
+    def create_3d_mesh(
+        self,
+        mesh_name="FiberMatrixRVE3D",
+        thickness=1.0,
+        mesh_size_factor=1.0,
+        z_layers=4,
+        visualize_gui=False,
+        check_periodicity=False,
+        periodic_z=False,
+        surface_groups=False,
+    ):
+        """Generates a 3D volume mesh for the current RVE configuration using GMSH.
+
+        The 3D mesh is created by extruding the fragmented 2D fiber/matrix
+        geometry through ``thickness``. Periodic 2D boundary pairs become
+        periodic side-surface pairs in the 3D mesh.
+
+        Parameters
+        ----------
+        mesh_name : str, optional
+            Base name for output files (.msh, .vtk). Default "FiberMatrixRVE3D".
+        thickness : float, optional
+            Extrusion thickness in the positive z direction. Default 1.0.
+        mesh_size_factor : float, optional
+            Global scaling factor for mesh element size. Default 1.0.
+        z_layers : int, optional
+            Number of mesh layers through the thickness. Default 4.
+        visualize_gui : bool, optional
+            If True, opens the GMSH GUI to visualize mesh generation steps. Default False.
+        check_periodicity : bool, optional
+            If True, asserts that generated mesh nodes on periodic surfaces match. Default False.
+        periodic_z : bool, optional
+            If True, also makes the top and bottom surfaces periodic. Default False.
+        surface_groups : bool, optional
+            If True, creates material-specific physical surface groups for
+            left, right, bottom, top, front, and back. Default False.
+        """
+        mesher = GmshMesher3D(mesh_name)
+        mesher.create_mesh(
+            self.fibers,
+            self.boundaries,
+            thickness,
+            mesh_size_factor,
+            z_layers,
+            visualize_gui,
+            check_periodicity,
+            periodic_z,
+            surface_groups,
         )
