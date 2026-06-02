@@ -73,7 +73,7 @@ rve.initialize_rectangle_rve(
 # 2. Place Fibers (Solve for non-overlapping configuration)
 print("Solving fiber placement...")
 iterations = rve.solve_fiber_locations(
-    min_spacing_ratio=1.05, 
+    min_spacing_ratio=0.05, 
     visualize=True  # Save frames of the packing process
 )
 print(f"Solved in {iterations} iterations.")
