@@ -526,6 +526,7 @@ class FiberRVE:
         check_periodicity=False,
         periodic_z=False,
         surface_groups=False,
+        composite_surface_groups=False,
     ):
         """Generates a 3D volume mesh for the current RVE configuration using GMSH.
 
@@ -552,6 +553,9 @@ class FiberRVE:
         surface_groups : bool, optional
             If True, creates material-specific physical surface groups for
             left, right, bottom, top, front, and back. Default False.
+        composite_surface_groups : bool, optional
+            If True, creates whole-composite physical surface groups for
+            left, right, bottom, top, front, and back. Default False.
         """
         mesher = GmshMesher3D(mesh_name)
         mesher.create_mesh(
@@ -564,4 +568,5 @@ class FiberRVE:
             check_periodicity,
             periodic_z,
             surface_groups,
+            composite_surface_groups,
         )

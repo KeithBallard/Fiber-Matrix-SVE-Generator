@@ -42,6 +42,7 @@ class GmshMesher3D:
         check_periodicity: bool = False,
         periodic_z: bool = False,
         surface_groups: bool = False,
+        composite_surface_groups: bool = False,
     ):
         """Creates a 3D fiber/matrix volume mesh using GMSH.
 
@@ -66,6 +67,9 @@ class GmshMesher3D:
             Default is False.
         surface_groups : bool, optional
             If True, creates material-specific physical surface groups for
+            left, right, bottom, top, front, and back. Default is False.
+        composite_surface_groups : bool, optional
+            If True, creates whole-composite physical surface groups for
             left, right, bottom, top, front, and back. Default is False.
         """
         if thickness <= 0:
@@ -219,6 +223,12 @@ class GmshMesher3D:
                 thickness,
                 matrix_volume_tags,
                 fiber_volume_tags,
+                rve_extent,
+            )
+        if composite_surface_groups:
+            self._add_composite_surface_physical_groups(
+                all_b_points,
+                thickness,
                 rve_extent,
             )
 
@@ -400,6 +410,36 @@ class GmshMesher3D:
                 continue
             group = gmsh.model.addPhysicalGroup(2, surface_tags)
             gmsh.model.setPhysicalName(2, group, f"{material}_{side}")
+
+    def _add_composite_surface_physical_groups(
+        self,
+        boundary_points,
+        thickness,
+        rve_extent,
+    ):
+        coords_min = np.min(boundary_points, axis=0)
+        coords_max = np.max(boundary_points, axis=0)
+        tolerance = max(rve_extent * 1e-8, 1e-9)
+        grouped_surfaces = {
+            "left": [],
+            "right": [],
+            "bottom": [],
+            "top": [],
+            "front": [],
+            "back": [],
+        }
+
+        for _, tag in gmsh.model.getEntities(2):
+            com = np.array(gmsh.model.occ.getCenterOfMass(2, tag))
+            sides = self._surface_sides(com, coords_min, coords_max, thickness, tolerance)
+            for side in sides:
+                grouped_surfaces[side.lower()].append(tag)
+
+        for side, surface_tags in grouped_surfaces.items():
+            if not surface_tags:
+                continue
+            group = gmsh.model.addPhysicalGroup(2, surface_tags)
+            gmsh.model.setPhysicalName(2, group, f"composite_{side}")
 
     def _surface_sides(self, com, coords_min, coords_max, thickness, tolerance):
         sides = []

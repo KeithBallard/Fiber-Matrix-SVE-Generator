@@ -120,6 +120,7 @@ rve.create_3d_mesh(
     check_periodicity=True,
     periodic_z=False,
     surface_groups=True,
+    composite_surface_groups=True,
 )
 print("3D mesh generated: my_composite_rve_3d.msh")
 ```
@@ -132,6 +133,15 @@ Matrix_Left    Matrix_Right    Matrix_Bottom
 Matrix_Top     Matrix_Front    Matrix_Back
 Fibers_Left    Fibers_Right    Fibers_Bottom
 Fibers_Top     Fibers_Front    Fibers_Back
+```
+
+When `composite_surface_groups=True`, the 3D mesh also includes whole-face
+surface groups that combine matrix and fiber patches for solid mechanics
+boundary conditions:
+
+```text
+composite_left    composite_right    composite_bottom
+composite_top     composite_front    composite_back
 ```
 
 Use `mesh_size_factor` to control the in-plane element size and `z_layers` to
