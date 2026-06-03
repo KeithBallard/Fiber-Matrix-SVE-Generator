@@ -19,7 +19,7 @@ def main():
     # 1. Initialize RVE
     rve = FiberRVE()
     rve.initialize_rectangle_rve(
-        num_fibers=20, vf=0.45, avg_diam=5.0, rve_aspect_ratio=1.0  # microns
+        num_fibers=20, vf=0.60, avg_diam=5.0, rve_aspect_ratio=1.0  # microns
     )
     print(f"RVE dimensions: {rve.rve_dims}")
 
