@@ -7,12 +7,12 @@ import numpy as np
 sys.path.append(Path(__file__).parent.parent.as_posix())
 from fiber_matrix.rve import FiberRVE
 
-
-DISTRIBUTION_NAME = "periodic_square_rve_3d_distribution.npz"
-MESH_NAME = "periodic_square_rve_3d_from_distribution"
-
 MESH_SIZE_FACTOR = 0.5
 Z_LAYERS = 24
+DISTRIBUTION_NAME = "periodic_square_rve_3d_distribution.npz"
+MESH_NAME = "periodic_square_rve_3d_mesh_"+ str(MESH_SIZE_FACTOR) + "_z" + str(Z_LAYERS)    
+
+
 
 
 def main():
