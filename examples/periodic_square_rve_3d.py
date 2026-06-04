@@ -57,7 +57,7 @@ def main():
         check_periodicity=True,
         periodic_z=False,
         surface_groups=True,
-        composite_surface_groups=True,
+        composite_surface_groups=False,
     )
 
 
