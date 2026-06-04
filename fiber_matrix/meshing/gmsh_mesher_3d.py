@@ -43,6 +43,13 @@ class GmshMesher3D:
         periodic_z: bool = False,
         surface_groups: bool = False,
         composite_surface_groups: bool = False,
+        uniform_mesh: bool = True,
+        fiber_mesh_size: float = None,
+        matrix_mesh_size: float = None,
+        boundary_mesh_size: float = None,
+        interface_refinement_distance: float = None,
+        boundary_refinement_distance: float = None,
+        recombine_prisms: bool = False,
     ):
         """Creates a 3D fiber/matrix volume mesh using GMSH.
 
@@ -71,6 +78,34 @@ class GmshMesher3D:
         composite_surface_groups : bool, optional
             If True, creates whole-composite physical surface groups for
             left, right, bottom, top, front, and back. Default is False.
+        uniform_mesh : bool, optional
+            If True, uses ``mesh_size_factor`` as a global uniform size.
+            If False, applies separate mesh sizes for fiber, matrix, and
+            exterior boundary regions. Default is True.
+        fiber_mesh_size : float, optional
+            Target element size on fiber surfaces when ``uniform_mesh`` is False.
+            Defaults to ``mesh_size_factor``.
+        matrix_mesh_size : float, optional
+            Target element size on matrix surfaces when ``uniform_mesh`` is False.
+            Defaults to ``mesh_size_factor``.
+        boundary_mesh_size : float, optional
+            Target element size on exterior domain boundaries when
+            ``uniform_mesh`` is False. Defaults to the smaller of fiber and
+            matrix mesh sizes.
+        interface_refinement_distance : float, optional
+            Distance away from fiber/matrix interfaces over which the mesh
+            transitions from ``fiber_mesh_size`` to ``matrix_mesh_size`` when
+            ``uniform_mesh`` is False. Defaults to three times
+            ``fiber_mesh_size``.
+        boundary_refinement_distance : float, optional
+            Distance away from exterior domain boundaries over which the mesh
+            transitions from ``boundary_mesh_size`` to ``matrix_mesh_size``
+            when ``uniform_mesh`` is False. Defaults to three times
+            ``boundary_mesh_size``.
+        recombine_prisms : bool, optional
+            If True, recombines the structured extrusion into prism/wedge
+            elements instead of subdividing into tetrahedra. This can remove
+            radial-looking tetrahedral subdivision patterns. Default is False.
         """
         if thickness <= 0:
             raise ValueError("thickness must be positive.")
@@ -130,8 +165,33 @@ class GmshMesher3D:
         )
         gmsh.model.occ.synchronize()
 
+        refinement_dimtags = []
+        if not uniform_mesh:
+            refinement_distance = self._default_refinement_distance(
+                mesh_size_factor,
+                fiber_mesh_size,
+                interface_refinement_distance,
+            )
+            boundary_distance = self._default_refinement_distance(
+                mesh_size_factor,
+                boundary_mesh_size,
+                boundary_refinement_distance,
+            )
+            refinement_dimtags = self._add_refinement_partition_disks(
+                fibers,
+                rve_dimtag,
+                scale_factor,
+                refinement_distance,
+                rve_extent,
+            )
+            refinement_dimtags += self._add_boundary_refinement_partition(
+                all_b_points,
+                scale_factor,
+                boundary_distance,
+            )
+
         out_dimtags, out_dimtags_map = gmsh.model.occ.fragment(
-            [rve_dimtag], clipped_fibers_dimtags
+            [rve_dimtag], clipped_fibers_dimtags + refinement_dimtags
         )
         if not out_dimtags_map:
             raise RuntimeError("GMSH Fragment operation returned an empty map.")
@@ -167,7 +227,7 @@ class GmshMesher3D:
             0,
             thickness,
             numElements=[z_layers],
-            recombine=False,
+            recombine=recombine_prisms,
         )
         gmsh.model.occ.synchronize()
 
@@ -232,27 +292,43 @@ class GmshMesher3D:
                 rve_extent,
             )
 
-        if mesh_size_factor:
+        if uniform_mesh and mesh_size_factor:
             gmsh.model.mesh.setSize(gmsh.model.getEntities(0), mesh_size_factor)
+        elif not uniform_mesh:
+            self._apply_material_mesh_sizes(
+                all_b_points,
+                thickness,
+                matrix_volume_tags,
+                fiber_volume_tags,
+                rve_extent,
+                mesh_size_factor,
+                fiber_mesh_size,
+                matrix_mesh_size,
+                boundary_mesh_size,
+                interface_refinement_distance,
+                boundary_refinement_distance,
+                periodic_surface_pairs,
+            )
 
         gmsh.model.mesh.generate(3)
 
         if visualize_gui:
             gmsh.fltk.run()
 
+        periodicity_message = None
         if check_periodicity:
             self._check_periodicity(periodic_surface_pairs, rve_extent)
+            periodicity_message = self._check_periodicity(periodic_surface_pairs, rve_extent)
+            
 
-        for secondary_tags, primary_tags, translation in periodic_surface_pairs:
-            try:
-                gmsh.model.mesh.setPeriodic(2, secondary_tags, primary_tags, translation)
-            except Exception as err:
-                print(f"Warning: Could not write GMSH periodic metadata: {err}")
+        self._set_periodic_surface_constraints(periodic_surface_pairs)
 
         gmsh.write(self.mesh_name + ".msh")
         gmsh.write(self.mesh_name + ".vtk")
 
         gmsh.finalize()
+        
+        print(periodicity_message)
 
     def _order_boundary_chain(self, boundaries, scale_factor):
         ordered_chain = []
@@ -307,6 +383,104 @@ class GmshMesher3D:
             fiber.radius * scale_factor,
             fiber.radius * scale_factor,
         )
+
+    def _default_refinement_distance(
+        self,
+        mesh_size_factor,
+        fiber_mesh_size,
+        interface_refinement_distance,
+    ):
+        if interface_refinement_distance is not None:
+            return interface_refinement_distance
+        base_size = mesh_size_factor if mesh_size_factor is not None else 1.0
+        fiber_size = fiber_mesh_size if fiber_mesh_size is not None else base_size
+        return 3.0 * fiber_size
+
+    def _add_refinement_partition_disks(
+        self,
+        fibers,
+        rve_dimtag,
+        scale_factor,
+        refinement_distance,
+        rve_extent,
+    ):
+        if refinement_distance <= 0:
+            raise ValueError("interface_refinement_distance must be positive.")
+
+        partition_disks = []
+        min_radius = max(rve_extent * 1e-8, 1e-9)
+        for fiber in self._get_all_fiber_copies(fibers):
+            outer_radius = fiber.radius + refinement_distance
+            partition_disks.append(
+                gmsh.model.occ.addDisk(
+                    fiber.center[0] * scale_factor,
+                    fiber.center[1] * scale_factor,
+                    0,
+                    outer_radius * scale_factor,
+                    outer_radius * scale_factor,
+                )
+            )
+
+            inner_radius = fiber.radius - refinement_distance
+            if inner_radius > min_radius:
+                partition_disks.append(
+                    gmsh.model.occ.addDisk(
+                        fiber.center[0] * scale_factor,
+                        fiber.center[1] * scale_factor,
+                        0,
+                        inner_radius * scale_factor,
+                        inner_radius * scale_factor,
+                    )
+                )
+
+        if not partition_disks:
+            return []
+
+        gmsh.model.occ.synchronize()
+        clipped_partitions, _ = gmsh.model.occ.intersect(
+            [(2, tag) for tag in partition_disks],
+            [rve_dimtag],
+            removeObject=True,
+            removeTool=False,
+        )
+        gmsh.model.occ.synchronize()
+        return [dt for dt in clipped_partitions if dt[0] == 2]
+
+    def _add_boundary_refinement_partition(
+        self,
+        boundary_points,
+        scale_factor,
+        boundary_refinement_distance,
+    ):
+        if boundary_refinement_distance <= 0:
+            raise ValueError("boundary_refinement_distance must be positive.")
+
+        coords_min = np.min(boundary_points, axis=0)
+        coords_max = np.max(boundary_points, axis=0)
+        inset_min = coords_min + boundary_refinement_distance
+        inset_max = coords_max - boundary_refinement_distance
+
+        if np.any(inset_min >= inset_max):
+            return []
+
+        corners = [
+            (inset_min[0], inset_min[1]),
+            (inset_max[0], inset_min[1]),
+            (inset_max[0], inset_max[1]),
+            (inset_min[0], inset_max[1]),
+        ]
+        point_tags = [
+            gmsh.model.occ.addPoint(x * scale_factor, y * scale_factor, 0)
+            for x, y in corners
+        ]
+        line_tags = [
+            gmsh.model.occ.addLine(point_tags[i], point_tags[(i + 1) % 4])
+            for i in range(4)
+        ]
+        wire = gmsh.model.occ.addWire(line_tags)
+        face = gmsh.model.occ.addPlaneSurface([wire])
+        gmsh.model.occ.synchronize()
+        return [(2, face)]
 
     def _get_all_fiber_copies(self, fibers):
         all_fibers = []
@@ -466,6 +640,89 @@ class GmshMesher3D:
             return "Matrix"
         return None
 
+    def _apply_material_mesh_sizes(
+        self,
+        boundary_points,
+        thickness,
+        matrix_volume_tags,
+        fiber_volume_tags,
+        rve_extent,
+        mesh_size_factor,
+        fiber_mesh_size,
+        matrix_mesh_size,
+        boundary_mesh_size,
+        interface_refinement_distance,
+        boundary_refinement_distance,
+        periodic_surface_pairs,
+    ):
+        base_size = mesh_size_factor if mesh_size_factor is not None else 1.0
+        fiber_size = fiber_mesh_size if fiber_mesh_size is not None else base_size
+        matrix_size = matrix_mesh_size if matrix_mesh_size is not None else base_size
+        boundary_size = (
+            boundary_mesh_size
+            if boundary_mesh_size is not None
+            else min(fiber_size, matrix_size)
+        )
+        for name, size in [
+            ("fiber_mesh_size", fiber_size),
+            ("matrix_mesh_size", matrix_size),
+            ("boundary_mesh_size", boundary_size),
+        ]:
+            if size <= 0:
+                raise ValueError(f"{name} must be positive.")
+
+        coords_min = np.min(boundary_points, axis=0)
+        coords_max = np.max(boundary_points, axis=0)
+        tolerance = max(rve_extent * 1e-8, 1e-9)
+        matrix_volume_tags = set(matrix_volume_tags)
+        fiber_volume_tags = set(fiber_volume_tags)
+
+        interface_points = set()
+        exterior_points = set()
+
+        for _, tag in gmsh.model.getEntities(2):
+            points = self._get_surface_boundary_points(tag)
+            adjacent_volumes, _ = gmsh.model.getAdjacencies(2, tag)
+            adjacent_volumes = set(int(volume_tag) for volume_tag in adjacent_volumes)
+
+            has_matrix = bool(adjacent_volumes & matrix_volume_tags)
+            has_fiber = bool(adjacent_volumes & fiber_volume_tags)
+            if has_matrix and has_fiber:
+                interface_points.update(points)
+
+            com = np.array(gmsh.model.occ.getCenterOfMass(2, tag))
+            if self._surface_sides(com, coords_min, coords_max, thickness, tolerance):
+                exterior_points.update(points)
+
+        gmsh.option.setNumber("Mesh.Algorithm", 6)
+        gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 1)
+        gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
+        gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
+        gmsh.option.setNumber("Mesh.MeshSizeMin", min(fiber_size, matrix_size, boundary_size))
+        gmsh.option.setNumber("Mesh.MeshSizeMax", matrix_size)
+
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), matrix_size)
+        if interface_points:
+            gmsh.model.mesh.setSize([(0, tag) for tag in interface_points], fiber_size)
+        if exterior_points:
+            gmsh.model.mesh.setSize([(0, tag) for tag in exterior_points], boundary_size)
+
+    def _set_periodic_surface_constraints(self, periodic_surface_pairs):
+        for secondary_tags, primary_tags, translation in periodic_surface_pairs:
+            try:
+                gmsh.model.mesh.setPeriodic(2, secondary_tags, primary_tags, translation)
+            except Exception as err:
+                print(f"Warning: Could not set GMSH periodic metadata: {err}")
+
+    def _get_surface_boundary_points(self, surface_tag):
+        return {
+            point_tag
+            for dim, point_tag in gmsh.model.getBoundary(
+                [(2, surface_tag)], oriented=False, recursive=True
+            )
+            if dim == 0
+        }
+
     def _boundary_translation(self, secondary_boundary, primary_boundary):
         mid_s = (secondary_boundary.points[0] + secondary_boundary.points[1]) / 2.0
         mid_p = (primary_boundary.points[0] + primary_boundary.points[1]) / 2.0
@@ -530,6 +787,7 @@ class GmshMesher3D:
 
     def _check_periodicity(self, periodic_surface_pairs, rve_extent):
         tolerance = max(rve_extent * 1e-6, 1e-9)
+        message = None
         for secondary_tags, primary_tags, translation in periodic_surface_pairs:
             secondary_coords = self._get_unique_surface_nodes(secondary_tags)
             primary_coords = self._get_unique_surface_nodes(primary_tags)
@@ -549,7 +807,9 @@ class GmshMesher3D:
                 )
 
             avg_dist = np.mean(dists) if len(dists) > 0 else 0.0
-            print(f"3D periodic check passed (avg dist: {avg_dist:.2e})")
+            message = f"3D periodic check passed (avg dist: {avg_dist:.2e})"
+            print(message)
+        return message
 
     def _get_unique_surface_nodes(self, surface_tags):
         nodes = {}

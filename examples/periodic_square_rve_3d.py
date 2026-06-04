@@ -8,6 +8,16 @@ sys.path.append(Path(__file__).parent.parent.as_posix())
 from fiber_matrix.rve import FiberRVE
 
 
+UNIFORM_MESH = False
+FIBER_MESH_SIZE = 0.25
+MATRIX_MESH_SIZE = 0.75
+BOUNDARY_MESH_SIZE = 0.25
+INTERFACE_REFINEMENT_DISTANCE = 0.75
+BOUNDARY_REFINEMENT_DISTANCE = 0.75
+Z_LAYERS = 24
+RECOMBINE_PRISMS = True
+
+
 def main():
     # Set to False to disable GUI windows from popping up
     show_guis = False
@@ -51,13 +61,20 @@ def main():
     rve.create_3d_mesh(
         mesh_name=Path(__file__).stem,
         thickness=rve.rve_dims[0],
-        mesh_size_factor=0.5,
-        z_layers=24,
+        mesh_size_factor=MATRIX_MESH_SIZE,
+        z_layers=Z_LAYERS,
         visualize_gui=show_guis,
         check_periodicity=True,
         periodic_z=False,
         surface_groups=True,
         composite_surface_groups=False,
+        uniform_mesh=UNIFORM_MESH,
+        fiber_mesh_size=FIBER_MESH_SIZE,
+        matrix_mesh_size=MATRIX_MESH_SIZE,
+        boundary_mesh_size=BOUNDARY_MESH_SIZE,
+        interface_refinement_distance=INTERFACE_REFINEMENT_DISTANCE,
+        boundary_refinement_distance=BOUNDARY_REFINEMENT_DISTANCE,
+        recombine_prisms=RECOMBINE_PRISMS,
     )
 
 

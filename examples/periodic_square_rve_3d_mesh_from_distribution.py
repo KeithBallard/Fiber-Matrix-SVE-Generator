@@ -7,13 +7,20 @@ import numpy as np
 sys.path.append(Path(__file__).parent.parent.as_posix())
 from fiber_matrix.rve import FiberRVE
 
-MESH_SIZE_FACTOR = 0.5
+UNIFORM_MESH = False  # Set to False to use different mesh sizes for fiber, matrix, and boundary regions
+FIBER_MESH_SIZE = 0.1
+MATRIX_MESH_SIZE = 1.5
+BOUNDARY_MESH_SIZE = 0.5
+INTERFACE_REFINEMENT_DISTANCE = 0.5
+BOUNDARY_REFINEMENT_DISTANCE = 0.5
 Z_LAYERS = 24
+RECOMBINE_PRISMS = True
 DISTRIBUTION_NAME = "periodic_square_rve_3d_distribution.npz"
-MESH_NAME = "periodic_square_rve_3d_mesh_"+ str(MESH_SIZE_FACTOR) + "_z" + str(Z_LAYERS)    
-
-
-
+MESH_NAME = (
+    f"periodic_square_rve_3d_mesh_z{Z_LAYERS}"
+    + ("_prism" if RECOMBINE_PRISMS else "_tet")
+    + (f"_uniform_{MATRIX_MESH_SIZE}" if UNIFORM_MESH else f"_fiber{FIBER_MESH_SIZE}_matrix{MATRIX_MESH_SIZE}_boundary{BOUNDARY_MESH_SIZE}_ifdist{INTERFACE_REFINEMENT_DISTANCE}_bdist{BOUNDARY_REFINEMENT_DISTANCE}")
+)
 
 def main():
     # Set to False to disable GUI windows from popping up
@@ -54,18 +61,25 @@ def main():
 
     print(f"Loaded distribution: {distribution_path}")
     print(f"RVE dimensions: {rve.rve_dims}")
-    print(f"Generating 3D mesh with mesh_size_factor={MESH_SIZE_FACTOR}")
+    print(f"Generating 3D mesh: {MESH_NAME}")
 
     rve.create_3d_mesh(
         mesh_name=MESH_NAME,
         thickness=rve.rve_dims[0],
-        mesh_size_factor=MESH_SIZE_FACTOR,
+        mesh_size_factor=MATRIX_MESH_SIZE,
         z_layers=Z_LAYERS,
         visualize_gui=show_guis,
         check_periodicity=True,
         periodic_z=False,
         surface_groups=True,
         composite_surface_groups=False,
+        uniform_mesh=UNIFORM_MESH,
+        fiber_mesh_size=FIBER_MESH_SIZE,
+        matrix_mesh_size=MATRIX_MESH_SIZE,
+        boundary_mesh_size=BOUNDARY_MESH_SIZE,
+        interface_refinement_distance=INTERFACE_REFINEMENT_DISTANCE,
+        boundary_refinement_distance=BOUNDARY_REFINEMENT_DISTANCE,
+        recombine_prisms=RECOMBINE_PRISMS,
     )
 
 

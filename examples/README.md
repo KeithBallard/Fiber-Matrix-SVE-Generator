@@ -46,14 +46,28 @@ This script:
 Important controls inside the script:
 
 ```python
-mesh_size_factor=0.5
+uniform_mesh=False
+fiber_mesh_size=0.25
+matrix_mesh_size=0.75
+boundary_mesh_size=0.25
+interface_refinement_distance=0.75
+boundary_refinement_distance=0.75
 z_layers=24
+recombine_prisms=True
 surface_groups=True
 composite_surface_groups=False
 ```
 
-Decrease `mesh_size_factor` for a finer in-plane mesh. Increase `z_layers` for
-more through-thickness refinement.
+Set `uniform_mesh=True` to use the old global `mesh_size_factor` behavior. Set
+`uniform_mesh=False` to use separate mesh sizes for the fiber, matrix, and
+exterior domain boundaries. Decrease `fiber_mesh_size`, `matrix_mesh_size`, or
+`boundary_mesh_size` to refine the corresponding region. The non-uniform mode
+adds refinement partitions, so `interface_refinement_distance` and
+`boundary_refinement_distance` control how far the fine mesh extends from the
+fiber/matrix interfaces and exterior domain boundaries. Increase `z_layers` for
+more through-thickness refinement. Set `recombine_prisms=True` to use prism/wedge
+elements in the extrusion direction, which avoids the radial tetrahedral
+subdivision pattern inside fibers. Set it to `False` if you need tetrahedra.
 
 For MOOSE/libMesh, avoid overlapping physical groups. The recommended setting is:
 
@@ -148,24 +162,33 @@ examples/output/periodic_square_rve_3d_from_distribution.vtk
 For mesh convergence studies, edit only these values:
 
 ```python
-MESH_SIZE_FACTOR = 0.5
+UNIFORM_MESH = False
+FIBER_MESH_SIZE = 0.25
+MATRIX_MESH_SIZE = 0.75
+BOUNDARY_MESH_SIZE = 0.25
 Z_LAYERS = 24
 ```
 
 Example convergence sequence:
 
 ```python
-MESH_SIZE_FACTOR = 1.0
+FIBER_MESH_SIZE = 0.50
+MATRIX_MESH_SIZE = 1.00
+BOUNDARY_MESH_SIZE = 0.50
 Z_LAYERS = 12
 ```
 
 ```python
-MESH_SIZE_FACTOR = 0.75
+FIBER_MESH_SIZE = 0.35
+MATRIX_MESH_SIZE = 0.75
+BOUNDARY_MESH_SIZE = 0.35
 Z_LAYERS = 18
 ```
 
 ```python
-MESH_SIZE_FACTOR = 0.5
+FIBER_MESH_SIZE = 0.25
+MATRIX_MESH_SIZE = 0.50
+BOUNDARY_MESH_SIZE = 0.25
 Z_LAYERS = 24
 ```
 

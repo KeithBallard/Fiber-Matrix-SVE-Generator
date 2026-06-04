@@ -527,6 +527,13 @@ class FiberRVE:
         periodic_z=False,
         surface_groups=False,
         composite_surface_groups=False,
+        uniform_mesh=True,
+        fiber_mesh_size=None,
+        matrix_mesh_size=None,
+        boundary_mesh_size=None,
+        interface_refinement_distance=None,
+        boundary_refinement_distance=None,
+        recombine_prisms=False,
     ):
         """Generates a 3D volume mesh for the current RVE configuration using GMSH.
 
@@ -556,6 +563,28 @@ class FiberRVE:
         composite_surface_groups : bool, optional
             If True, creates whole-composite physical surface groups for
             left, right, bottom, top, front, and back. Default False.
+        uniform_mesh : bool, optional
+            If True, uses mesh_size_factor as a global mesh size. If False,
+            applies separate mesh sizes for fiber, matrix, and exterior boundary
+            regions. Default True.
+        fiber_mesh_size : float, optional
+            Target element size on fiber surfaces for non-uniform meshes.
+        matrix_mesh_size : float, optional
+            Target element size on matrix surfaces for non-uniform meshes.
+        boundary_mesh_size : float, optional
+            Target element size on exterior domain boundaries for non-uniform meshes.
+        interface_refinement_distance : float, optional
+            Distance away from fiber/matrix interfaces over which the mesh
+            transitions from fiber_mesh_size to matrix_mesh_size. Used only
+            when uniform_mesh is False.
+        boundary_refinement_distance : float, optional
+            Distance away from exterior domain boundaries over which the mesh
+            transitions from boundary_mesh_size to matrix_mesh_size. Used only
+            when uniform_mesh is False.
+        recombine_prisms : bool, optional
+            If True, recombines the structured extrusion into prism/wedge
+            elements instead of subdividing into tetrahedra. This can reduce
+            radial-looking tetrahedral subdivision patterns. Default False.
         """
         mesher = GmshMesher3D(mesh_name)
         mesher.create_mesh(
@@ -569,4 +598,11 @@ class FiberRVE:
             periodic_z,
             surface_groups,
             composite_surface_groups,
+            uniform_mesh,
+            fiber_mesh_size,
+            matrix_mesh_size,
+            boundary_mesh_size,
+            interface_refinement_distance,
+            boundary_refinement_distance,
+            recombine_prisms,
         )

@@ -120,7 +120,14 @@ rve.create_3d_mesh(
     check_periodicity=True,
     periodic_z=False,
     surface_groups=True,
-    composite_surface_groups=True,
+    composite_surface_groups=False,
+    uniform_mesh=False,
+    fiber_mesh_size=0.25,
+    matrix_mesh_size=0.75,
+    boundary_mesh_size=0.25,
+    interface_refinement_distance=0.75,
+    boundary_refinement_distance=0.75,
+    recombine_prisms=True,
 )
 print("3D mesh generated: my_composite_rve_3d.msh")
 ```
@@ -136,16 +143,31 @@ Fibers_Top     Fibers_Front    Fibers_Back
 ```
 
 When `composite_surface_groups=True`, the 3D mesh also includes whole-face
-surface groups that combine matrix and fiber patches for solid mechanics
-boundary conditions:
+surface groups that combine matrix and fiber patches:
 
 ```text
 composite_left    composite_right    composite_bottom
 composite_top     composite_front    composite_back
 ```
 
-Use `mesh_size_factor` to control the in-plane element size and `z_layers` to
-control refinement through the extrusion direction.
+For MOOSE/libMesh, avoid overlapping physical groups by keeping
+`composite_surface_groups=False` and applying whole-face boundary conditions to
+both material-specific surfaces in the input file, for example
+`boundary = 'Matrix_Left Fibers_Left'`.
+
+Use `mesh_size_factor` with `uniform_mesh=True` for a single global mesh size.
+For non-uniform meshes, set `uniform_mesh=False` and control material/domain
+sizes with `fiber_mesh_size`, `matrix_mesh_size`, and `boundary_mesh_size`.
+The non-uniform mode adds refinement partitions before meshing:
+`fiber_mesh_size` applies near fiber/matrix interfaces, `boundary_mesh_size`
+applies near exterior domain boundaries, and `matrix_mesh_size` applies away
+from those refinement bands. Use `interface_refinement_distance` and
+`boundary_refinement_distance` to control how far the fine mesh extends from
+those surfaces. Use `z_layers` to control refinement through the extrusion
+direction.
+Set `recombine_prisms=True` to keep the structured extrusion as prism/wedge
+elements, which avoids the radial tetrahedral subdivision pattern inside each
+fiber. Set it to `False` if a downstream solver requires tetrahedral elements.
 
 ### 3. Visualize Results
 
