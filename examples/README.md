@@ -2,12 +2,7 @@
 
 These scripts show how to generate 2D RVEs, extruded 3D RVEs, and fixed fiber
 distributions for mesh convergence studies. Run commands from the repository
-root:
-
-```bash
-conda activate codex-env
-cd /home/dasp/projects/codex_dir/Fiber-Matrix-SVE-Generator
-```
+root.
 
 All examples write files into `examples/output/`.
 
