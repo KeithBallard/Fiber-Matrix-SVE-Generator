@@ -527,6 +527,7 @@ class FiberRVE:
         periodic_z=False,
         surface_groups=False,
         composite_surface_groups=False,
+        anchor_node_groups=False,
         uniform_mesh=True,
         fiber_mesh_size=None,
         matrix_mesh_size=None,
@@ -563,6 +564,10 @@ class FiberRVE:
         composite_surface_groups : bool, optional
             If True, creates whole-composite physical surface groups for
             left, right, bottom, top, front, and back. Default False.
+        anchor_node_groups : bool, optional
+            If True, creates 0D physical groups named anchor_xyz, anchor_yz,
+            and anchor_z for mechanical constraint boundary conditions.
+            Default False.
         uniform_mesh : bool, optional
             If True, uses mesh_size_factor as a global mesh size. If False,
             applies separate mesh sizes for fiber, matrix, and exterior boundary
@@ -598,6 +603,7 @@ class FiberRVE:
             periodic_z,
             surface_groups,
             composite_surface_groups,
+            anchor_node_groups,
             uniform_mesh,
             fiber_mesh_size,
             matrix_mesh_size,

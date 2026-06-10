@@ -73,6 +73,7 @@ def main():
         periodic_z=False,
         surface_groups=True,
         composite_surface_groups=False,
+        anchor_node_groups=True,
         uniform_mesh=UNIFORM_MESH,
         fiber_mesh_size=FIBER_MESH_SIZE,
         matrix_mesh_size=MATRIX_MESH_SIZE,

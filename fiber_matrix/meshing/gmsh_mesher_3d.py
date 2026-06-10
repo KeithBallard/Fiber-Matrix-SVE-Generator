@@ -43,6 +43,7 @@ class GmshMesher3D:
         periodic_z: bool = False,
         surface_groups: bool = False,
         composite_surface_groups: bool = False,
+        anchor_node_groups: bool = False,
         uniform_mesh: bool = True,
         fiber_mesh_size: float = None,
         matrix_mesh_size: float = None,
@@ -78,6 +79,10 @@ class GmshMesher3D:
         composite_surface_groups : bool, optional
             If True, creates whole-composite physical surface groups for
             left, right, bottom, top, front, and back. Default is False.
+        anchor_node_groups : bool, optional
+            If True, creates 0D physical groups named ``anchor_xyz``,
+            ``anchor_yz``, and ``anchor_z`` for mechanical constraint boundary
+            conditions. Default is False.
         uniform_mesh : bool, optional
             If True, uses ``mesh_size_factor`` as a global uniform size.
             If False, applies separate mesh sizes for fiber, matrix, and
@@ -291,6 +296,8 @@ class GmshMesher3D:
                 thickness,
                 rve_extent,
             )
+        if anchor_node_groups:
+            self._add_anchor_node_physical_groups(all_b_points, thickness, rve_extent)
 
         if uniform_mesh and mesh_size_factor:
             gmsh.model.mesh.setSize(gmsh.model.getEntities(0), mesh_size_factor)
@@ -319,7 +326,6 @@ class GmshMesher3D:
         if check_periodicity:
             self._check_periodicity(periodic_surface_pairs, rve_extent)
             periodicity_message = self._check_periodicity(periodic_surface_pairs, rve_extent)
-            
 
         self._set_periodic_surface_constraints(periodic_surface_pairs)
 
@@ -614,6 +620,38 @@ class GmshMesher3D:
                 continue
             group = gmsh.model.addPhysicalGroup(2, surface_tags)
             gmsh.model.setPhysicalName(2, group, f"composite_{side}")
+
+    def _add_anchor_node_physical_groups(self, boundary_points, thickness, rve_extent):
+        coords_min = np.min(boundary_points, axis=0)
+        coords_max = np.max(boundary_points, axis=0)
+        tolerance = max(rve_extent * 1e-6, 1e-9)
+        anchors = {
+            "anchor_xyz": np.array([coords_min[0], coords_min[1], 0.0]),
+            "anchor_yz": np.array([coords_max[0], coords_min[1], 0.0]),
+            "anchor_z": np.array([coords_min[0], coords_max[1], 0.0]),
+        }
+
+        for name, target in anchors.items():
+            point_tag = self._find_nearest_point_entity(target, tolerance)
+            group = gmsh.model.addPhysicalGroup(0, [point_tag])
+            gmsh.model.setPhysicalName(0, group, name)
+
+    def _find_nearest_point_entity(self, target, tolerance):
+        best_tag = None
+        best_dist = np.inf
+        for _, tag in gmsh.model.getEntities(0):
+            coords = np.array(gmsh.model.getValue(0, tag, []))
+            dist = np.linalg.norm(coords - target)
+            if dist < best_dist:
+                best_dist = dist
+                best_tag = tag
+
+        if best_tag is None or best_dist > tolerance:
+            raise RuntimeError(
+                "Could not find geometric point for anchor node group near "
+                f"{target.tolist()}."
+            )
+        return best_tag
 
     def _surface_sides(self, com, coords_min, coords_max, thickness, tolerance):
         sides = []

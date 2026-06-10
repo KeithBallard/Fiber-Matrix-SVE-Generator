@@ -56,6 +56,7 @@ z_layers=24
 recombine_prisms=True
 surface_groups=True
 composite_surface_groups=False
+anchor_node_groups=True
 ```
 
 Set `uniform_mesh=True` to use the old global `mesh_size_factor` behavior. Set
@@ -84,6 +85,15 @@ Matrix_Top     Matrix_Front    Matrix_Back
 Fibers_Left    Fibers_Right    Fibers_Bottom
 Fibers_Top     Fibers_Front    Fibers_Back
 Matrix         Fibers
+```
+
+Set `anchor_node_groups=True` to add 0D physical groups for mechanical
+constraints:
+
+```text
+anchor_xyz    left-front-bottom corner
+anchor_yz     right-front-bottom point along the x direction
+anchor_z      left-back-bottom point in the xy plane
 ```
 
 For a whole composite face in MOOSE, combine matrix and fiber boundaries in the

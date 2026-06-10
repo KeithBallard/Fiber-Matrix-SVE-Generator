@@ -121,6 +121,7 @@ rve.create_3d_mesh(
     periodic_z=False,
     surface_groups=True,
     composite_surface_groups=False,
+    anchor_node_groups=True,
     uniform_mesh=False,
     fiber_mesh_size=0.25,
     matrix_mesh_size=0.75,
@@ -148,6 +149,15 @@ surface groups that combine matrix and fiber patches:
 ```text
 composite_left    composite_right    composite_bottom
 composite_top     composite_front    composite_back
+```
+
+When `anchor_node_groups=True`, the 3D mesh includes three 0D physical groups
+for mechanical constraints:
+
+```text
+anchor_xyz    left-front-bottom corner
+anchor_yz     right-front-bottom point along the x direction
+anchor_z      left-back-bottom point in the xy plane
 ```
 
 For MOOSE/libMesh, avoid overlapping physical groups by keeping
