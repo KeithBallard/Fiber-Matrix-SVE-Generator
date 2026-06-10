@@ -203,6 +203,15 @@ python build_docs.py --serve
 
 Then open your browser to `http://127.0.0.1:8000`.
 
+You can also build a static offline version:
+
+```bash
+python build_docs.py --offline
+```
+
+Then open `site/index.html`, or deploy the generated `site/` directory to
+GitHub Pages.
+
 ## Project Structure
 
 - `fiber_matrix/`: Main package source.
