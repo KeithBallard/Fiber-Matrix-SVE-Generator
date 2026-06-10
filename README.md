@@ -194,7 +194,11 @@ plt.show()
 
 ## Documentation
 
-Full API documentation is available. You can build and view it locally:
+Full API documentation is published at:
+
+https://uta-dasp.github.io/Fiber-Matrix-SVE-Generator/
+
+You can also build and view it locally:
 
 ```bash
 # Build and serve the documentation site
