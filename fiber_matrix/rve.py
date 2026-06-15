@@ -13,6 +13,7 @@ from .models.boundary import LinearBoundary, BoundaryType
 from .models.fiber import Fiber, PeriodicPrimaryFiber
 from .generation.placement import FiberPlacementSolver
 from .meshing.gmsh_mesher import GmshMesher
+from .meshing.gmsh_mesher_3d import GmshMesher3D
 from .visualization import plotting
 
 try:
@@ -513,4 +514,101 @@ class FiberRVE:
             mesh_size_factor,
             visualize_gui,
             check_periodicity,
+        )
+
+    def create_3d_mesh(
+        self,
+        mesh_name="FiberMatrixRVE3D",
+        thickness=1.0,
+        mesh_size_factor=1.0,
+        z_layers=4,
+        visualize_gui=False,
+        check_periodicity=False,
+        periodic_z=False,
+        surface_groups=False,
+        composite_surface_groups=False,
+        anchor_node_groups=False,
+        uniform_mesh=True,
+        fiber_mesh_size=None,
+        matrix_mesh_size=None,
+        boundary_mesh_size=None,
+        interface_refinement_distance=None,
+        boundary_refinement_distance=None,
+        recombine_prisms=False,
+    ):
+        """Generates a 3D volume mesh for the current RVE configuration using GMSH.
+
+        The 3D mesh is created by extruding the fragmented 2D fiber/matrix
+        geometry through ``thickness``. Periodic 2D boundary pairs become
+        periodic side-surface pairs in the 3D mesh.
+
+        Parameters
+        ----------
+        mesh_name : str, optional
+            Base name for output files (.msh, .vtk). Default "FiberMatrixRVE3D".
+        thickness : float, optional
+            Extrusion thickness in the positive z direction. Default 1.0.
+        mesh_size_factor : float, optional
+            Global scaling factor for mesh element size. Default 1.0.
+        z_layers : int, optional
+            Number of mesh layers through the thickness. Default 4.
+        visualize_gui : bool, optional
+            If True, opens the GMSH GUI to visualize mesh generation steps. Default False.
+        check_periodicity : bool, optional
+            If True, asserts that generated mesh nodes on periodic surfaces match. Default False.
+        periodic_z : bool, optional
+            If True, also makes the top and bottom surfaces periodic. Default False.
+        surface_groups : bool, optional
+            If True, creates material-specific physical surface groups for
+            left, right, bottom, top, front, and back. Default False.
+        composite_surface_groups : bool, optional
+            If True, creates whole-composite physical surface groups for
+            left, right, bottom, top, front, and back. Default False.
+        anchor_node_groups : bool, optional
+            If True, creates 0D physical groups named anchor_xyz, anchor_yz,
+            and anchor_z for mechanical constraint boundary conditions.
+            Default False.
+        uniform_mesh : bool, optional
+            If True, uses mesh_size_factor as a global mesh size. If False,
+            applies separate mesh sizes for fiber, matrix, and exterior boundary
+            regions. Default True.
+        fiber_mesh_size : float, optional
+            Target element size on fiber surfaces for non-uniform meshes.
+        matrix_mesh_size : float, optional
+            Target element size on matrix surfaces for non-uniform meshes.
+        boundary_mesh_size : float, optional
+            Target element size on exterior domain boundaries for non-uniform meshes.
+        interface_refinement_distance : float, optional
+            Distance away from fiber/matrix interfaces over which the mesh
+            transitions from fiber_mesh_size to matrix_mesh_size. Used only
+            when uniform_mesh is False.
+        boundary_refinement_distance : float, optional
+            Distance away from exterior domain boundaries over which the mesh
+            transitions from boundary_mesh_size to matrix_mesh_size. Used only
+            when uniform_mesh is False.
+        recombine_prisms : bool, optional
+            If True, recombines the structured extrusion into prism/wedge
+            elements instead of subdividing into tetrahedra. This can reduce
+            radial-looking tetrahedral subdivision patterns. Default False.
+        """
+        mesher = GmshMesher3D(mesh_name)
+        mesher.create_mesh(
+            self.fibers,
+            self.boundaries,
+            thickness,
+            mesh_size_factor,
+            z_layers,
+            visualize_gui,
+            check_periodicity,
+            periodic_z,
+            surface_groups,
+            composite_surface_groups,
+            anchor_node_groups,
+            uniform_mesh,
+            fiber_mesh_size,
+            matrix_mesh_size,
+            boundary_mesh_size,
+            interface_refinement_distance,
+            boundary_refinement_distance,
+            recombine_prisms,
         )

@@ -13,3 +13,4 @@ This package generates Representative Volume Elements (RVEs) for fiber-matrix co
 ## Getting Started
 
 Check out the [API Reference](api/rve.md) to see how to use the `FiberRVE` class.
+For 3D workflows, see [3D RVE Meshing](3d_meshing.md).

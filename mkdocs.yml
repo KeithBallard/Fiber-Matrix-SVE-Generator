@@ -1,4 +1,5 @@
 site_name: Fiber Matrix SVE
+use_directory_urls: false
 theme:
   name: material
   logo: assets/logo.png
@@ -19,9 +20,12 @@ plugins:
 
 nav:
   - Home: index.md
+  - 3D RVE Meshing: 3d_meshing.md
   - API Reference:
     - RVE Interface: api/rve.md
     - Models: api/models.md
     - Generation: api/generation.md
-    - Meshing: api/meshing.md
+    - 2D Meshing: api/meshing.md
+    - 3D Meshing: api/meshing_3d.md
     - Visualization: api/visualization.md
+  - Offline / GitHub Pages: offline.md
